@@ -24,7 +24,7 @@ update this section.
 
 - **URL pattern**: `https://llo.lu[/{lang}]/learn/lessons/{LESSON_CODE}/{ACTIVITY_CODE}`. The `/{lang}/` segment is **omitted for the default locale (FR)** and present for `de` / `en` / `lb`. Don't write a regex that requires the lang segment.
 - **Authoritative metadata is in Inertia page props**: `JSON.parse(document.getElementById('app').dataset.page)` gives `{component, props: {locale, activity?, lesson?, …}}`. Prefer this over URL parsing or DOM scraping.
-- **Score-widget pitfall**: `text.CircularProgressbar-text` exists in **two** places. The one in `<header>` shows question progress (`1 / 6` while answering); the one in `<main>` shows the final score. The selector throughout the code must be scoped to `main` (`main text.CircularProgressbar-text`).
+- **Score capture**: the result screen shows the score as a **percentage** (`83 %`) in the `<main>` textContent. The code reads this with `/\b(\d+(?:\.\d+)?)\s*%/` on `document.querySelector('main')?.textContent` — **not** via `text.CircularProgressbar-text`. Scores are stored as `bestScore` (rounded integer) out of `bestTotal = 100`. The CircularProgressbar widgets show question-answered counts (`6/6`), not the percentage, so they are not used.
 - **Activity types**: `DRAG_AND_DROP`, `MULTIPLE_CHOICE`, `OPEN`, `LINKS`, `CROSS_WORDS`, `WORD_SEARCH`, `FIND_TIME`, `WRITE_TIME`, `RIGHT_FALSE`, `SPELLING`, `SUMMARY_TEST` are scored. `GRAMMAR_RULE`, `VOCABULARY_LIST`, `VIDEO`, `FLASH_CARDS` are theory (viewed). Unknown future types default to viewed (D13 in the spec).
 - **Pass threshold**: 70%.
 - **No login required.** Anonymous fetches return full content.
@@ -71,7 +71,7 @@ both branches of the URL filter work.
 | `manifest.json` | MV3 manifest. Permissions: `storage`, `sidePanel`. Host: `https://llo.lu/*`. |
 | `background.js` | Service worker. Only sets `sidePanel.setPanelBehavior` so toolbar-icon click opens the panel. |
 | `inject.js` | MAIN-world: patches `history.pushState/replaceState` and dispatches `llo:navigate`. |
-| `content.js` | ISOLATED-world: capture lifecycle, badge injection, settings, storage. |
+| `content.js` | ISOLATED-world: capture lifecycle, badge injection, settings, storage. Also caches `lesson:*` records when visiting lesson pages (used for accurate done/total badge counts). Injects level-banner and mission badges on `/learn/{theme}/{level}` pages. |
 | `content.css` | Badge styling (light + dark). All selectors prefixed `llo-tracker-`. |
 | `sidepanel/sidepanel.html` | Side panel shell. |
 | `sidepanel/sidepanel.js` | Side panel logic — load records, render, settings, export/reset. |
@@ -97,18 +97,21 @@ render. The record should appear in storage within `STABILITY_MS`
 
 ## Common gotchas when editing
 
-- Forgetting to scope the score selector to `<main>` will record in-progress question counts as scores. The spec calls this out specifically — it's the kind of bug that "works" until the user actually finishes an exercise and realizes their data is wrong.
+- The score is read from `document.querySelector('main')?.textContent` using a `%` regex. A false-positive risk: theory pages sometimes contain percentage strings (e.g. "80% of sentences use…"). The guard in `checkForResult` short-circuits when the activity type is a known theory type or `classifyFromCode` returns `'viewed'` — don't remove or weaken that guard.
 - The FR locale URL has no language prefix. Test with the bare `/learn/lessons/...` path.
 - After saving a record, the storage-change listener fires and triggers a badge refresh in every open llo.lu tab. Don't accidentally write storage in a loop from the badge code itself.
+- Lesson cache (`lesson:*` keys) is written from `content.js` whenever a lesson page loads. `refreshBadges` reads it to show accurate `done/total` counts on lesson cards. If you add fields to the cache, bump `cachedAt` logic so stale entries don't mislead the badge math.
 - `chrome.sidePanel` requires Chrome 114+. The user is fine with that — don't try to support older versions.
 
 ## Where to look first when something is wrong
 
 | Symptom | First place to look |
 |---|---|
-| Score not captured | `content.js` §5.5; check that `main text.CircularProgressbar-text` matches the result-screen widget. |
-| Score recorded as `1/6` (or similar) | The header-vs-main fix isn't applied. Check the selector. |
+| Score not captured | `content.js` `checkForResult`; verify `document.querySelector('main')?.textContent` contains a `%` on the result screen, and that the activity-type guard isn't blocking it. |
+| Score recorded wrongly (theory page) | The type guard in `checkForResult` — ensure `SCORED_TYPES` and `classifyFromCode` correctly identify the activity. |
 | Badges don't appear | `settings.showInPageBadges`; `content.css` loaded; `refreshBadges()` called on `llo:navigate`. |
+| Level banner / mission badges missing | `LEVEL_PATH_RE` must match the URL; `props.missions` must be in Inertia data; lesson cache (`lesson:*`) must exist for accurate "done" counts. |
+| Lesson card shows wrong done/total | Lesson cache may be stale or absent — visit the lesson detail page to refresh it. |
 | Side panel won't open from icon | `background.js` set `openPanelOnActionClick: true`? |
 | FR locale users not tracked | `ACTIVITY_PATH_RE` — is the lang segment optional? |
 | Theory not recorded | Dwell timer cleared too early on tear-down. |
