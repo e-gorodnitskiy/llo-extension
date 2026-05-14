@@ -54,7 +54,7 @@ page long enough to count it as a real visit. Everything is written to
 
 ## Privacy
 
-- Nothing leaves your browser. Ever.
+- The extension does not send your progress data to any server. All tracked data is stored locally in your browser using `chrome.storage.local` and is not itself shared with the developer or any third party.
 - The extension only activates on `https://llo.lu/*`. It does nothing
   on any other domain.
 - It does not modify llo.lu's content or behavior; it only appends
@@ -98,3 +98,7 @@ folder is all there is to it.
 ## License
 
 MIT (see `LICENSE` if present).
+
+## Disclaimer
+
+LLO.lu is a trademark of its respective owners. This extension is an independent project and is not affiliated with or endorsed by llo.lu.
