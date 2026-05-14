@@ -1,6 +1,6 @@
-# LLO.lu Progress Tracker
+# Progress Tracker for LLO.lu
 
-A Chrome extension that quietly tracks your progress on
+An unofficial Chrome extension that quietly tracks your progress on
 [llo.lu](https://llo.lu) — both scored exercises and theory activities
 (grammar rules, vocabulary lists, videos) — and shows you what you've
 already done, both as small badges next to each exercise on llo.lu and
@@ -8,6 +8,21 @@ as a side-panel overview.
 
 Everything is stored locally in your browser. No account, no server,
 no network requests, no analytics.
+
+## Why this exists
+
+In January 2026, LLO.lu redesigned its platform to open access for
+everyone, with no account creation required. As part of that
+transition, user accounts were deactivated and the built-in progress
+tracking went away. This extension is an independent, local-only tool
+that lets learners keep their own progress history on their own
+device.
+
+> This extension is an independent project and is **not affiliated
+> with, endorsed by, or connected to** llo.lu, the Institut National
+> des Langues Luxembourg, the Luxembourg Ministry of Education, or
+> ALTISSIA. "LLO.lu" is used here only to describe which site this
+> extension works with.
 
 ## What it tracks
 
@@ -54,11 +69,11 @@ page long enough to count it as a real visit. Everything is written to
 
 ## Privacy
 
-- The extension does not send your progress data to any server. All tracked data is stored locally in your browser using `chrome.storage.local` and is not itself shared with the developer or any third party.
-- The extension only activates on `https://llo.lu/*`. It does nothing
-  on any other domain.
-- It does not modify llo.lu's content or behavior; it only appends
-  small status badges as siblings of existing links.
+See [`docs/privacy.html`](docs/privacy.html) for the full policy. In short:
+
+- The extension does not send your progress data to any server. All tracked data is stored locally in your browser using `chrome.storage.local` and is not shared with the developer or any third party.
+- The extension only activates on `https://llo.lu/*`. It does nothing on any other domain.
+- It does not modify llo.lu's content or behavior; it only appends small status badges as siblings of existing links.
 
 ## Disabling badges
 
@@ -97,8 +112,17 @@ folder is all there is to it.
 
 ## License
 
-MIT (see `LICENSE` if present).
+MIT (see [`LICENSE`](LICENSE)).
 
-## Disclaimer
+## Trademarks and affiliation
 
-LLO.lu is a trademark of its respective owners. This extension is an independent project and is not affiliated with or endorsed by llo.lu.
+"LLO.lu", "Léier Lëtzebuergesch Online", and any related logos are the
+property of their respective owners (the Institut National des Langues
+Luxembourg, the Luxembourg Ministry of Education, Children and Youth,
+and/or ALTISSIA INTERNATIONAL S.A.). The name is used here in a
+descriptive sense only — to indicate which website this extension is
+designed to work with — and does not imply any affiliation with or
+endorsement by those parties.
+
+If you are a rights holder and would like changes to this project,
+please open an issue on the repository.

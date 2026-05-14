@@ -3,10 +3,134 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy – LLO.lu Progress Tracker</title>
+  <title>Privacy Policy – Progress Tracker for LLO.lu</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; color: #1a1a1a; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.1rem; margin-top: 1.75rem; }
+    code { background: #f3f3f3; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.95em; }
+    .meta { color: #666; font-size: 0.9rem; }
+    ul { padding-left: 1.25rem; }
+    li { margin: 0.25rem 0; }
+  </style>
 </head>
 <body>
-  <h1>Privacy Policy – LLO.lu Progress Tracker</h1>
-  <p>In this policy, "the extension" refers only to LLO.lu Progress Tracker. LLO.lu Progress Tracker does not send your progress data to any server. The extension stores all tracked data locally in your browser using <code>chrome.storage.local</code> and does not itself share it with the developer or any third party.</p>
+  <h1>Privacy Policy — Progress Tracker for LLO.lu</h1>
+  <p class="meta">Last updated: 14 May 2026</p>
+
+  <p>In this policy, "the extension" refers only to the
+    <em>Progress Tracker for LLO.lu</em> browser extension. The extension
+    is an independent project and is not affiliated with, endorsed by, or
+    connected to llo.lu, the Institut National des Langues Luxembourg,
+    the Luxembourg Ministry of Education, or ALTISSIA INTERNATIONAL S.A.
+    This policy does not cover llo.lu itself; for that, see
+    <a href="https://llo.lu/en/privacy-policy/">llo.lu's privacy policy</a>.</p>
+
+  <p>The extension exists because in January 2026, LLO.lu redesigned
+    its platform to open access with no account creation required, and
+    the previous built-in progress tracking was discontinued. This
+    extension is an independent, local-only tool that lets learners
+    keep their own progress history on their own device.</p>
+
+  <h2>Short version</h2>
+  <p>The extension reads information already shown on
+    <a href="https://llo.lu">llo.lu</a> pages in your own browser
+    (which exercises you complete and your scores) and stores it
+    locally on your device. It does not make any network requests, send
+    anything to any server, contact the developer, or share any data
+    with third parties. There is no account and no telemetry.</p>
+
+  <h2>What data the extension reads</h2>
+  <p>While you have an llo.lu page open, the extension reads the following
+    from that page only:</p>
+  <ul>
+    <li>The URL path, to detect when you are on a lesson or activity page.</li>
+    <li>The page's own state object (the Inertia <code>data-page</code>
+      attribute that llo.lu already renders into the DOM) — used to
+      identify the current activity, lesson, level, theme, and interface
+      language.</li>
+    <li>For scored exercises: the percentage score shown on the result
+      screen at the end of the exercise.</li>
+    <li>For theory activities (grammar rules, vocabulary lists, videos,
+      flashcards): the fact that you stayed on the page for at least
+      5 seconds.</li>
+  </ul>
+  <p>The extension only activates on URLs matching
+    <code>https://llo.lu/*</code>. It has no host permissions for any
+    other site and reads no data anywhere else.</p>
+
+  <h2>What data is stored, where, and for how long</h2>
+  <p>The data above is written to
+    <code>chrome.storage.local</code> — an area of your own browser's
+    storage that is local to your device. Stored records contain:</p>
+  <ul>
+    <li>The activity code, lesson code, level, theme, and language tag
+      (short identifiers used by llo.lu, e.g.
+      <code>LB_LU_A1_GRAMMAR_W_FRO_WAT</code>).</li>
+    <li>The activity name and lesson name as shown by llo.lu.</li>
+    <li>For scored exercises: best score, last score, attempt count,
+      pass/fail flag, and timestamps of first and last completion.</li>
+    <li>For theory: view count and timestamps of first and last view.</li>
+    <li>A cache of which activities each visited lesson contains, so the
+      extension can show accurate "done / total" badges.</li>
+    <li>Your settings (currently just the "show progress badges"
+      preference).</li>
+  </ul>
+  <p>Records persist until you remove them. You can delete all data at any
+    time using the <strong>Reset Data</strong> button in the side panel,
+    or by removing the extension from Chrome.</p>
+
+  <h2>What the extension does NOT do</h2>
+  <ul>
+    <li>It does not make any HTTP, fetch, WebSocket, or other network
+      requests of its own. No connection to the developer, no analytics,
+      no remote logging, no remote configuration, no automatic updates of
+      tracked data.</li>
+    <li>It does not send data to llo.lu either; it only reads what your
+      browser has already rendered locally.</li>
+    <li>It does not transmit, sell, share, or otherwise transfer your data
+      to any third party.</li>
+    <li>It does not use your data for advertising, profiling, or any
+      purpose unrelated to the single feature of showing you your own
+      progress.</li>
+    <li>It does not read or store passwords, authentication tokens,
+      cookies, or personal account information.</li>
+    <li>It does not modify llo.lu's content or behavior; it only appends
+      small status badges as sibling elements alongside existing links.</li>
+    <li>It does not run on any website other than llo.lu.</li>
+  </ul>
+
+  <h2>Permissions, explained</h2>
+  <ul>
+    <li><code>storage</code> — required to save your progress records in
+      your own browser via <code>chrome.storage.local</code>.</li>
+    <li><code>sidePanel</code> — required to show the progress overview
+      panel when you click the toolbar icon.</li>
+    <li>Host permission for <code>https://llo.lu/*</code> — required so
+      the content script can read the page state on llo.lu in order to
+      identify activities and capture scores. The extension has no
+      permission to read any other site.</li>
+  </ul>
+
+  <h2>Export</h2>
+  <p>The side panel includes an <strong>Export JSON</strong> button. When
+    you click it, the extension creates a JSON file containing your
+    records and settings and triggers a download via your browser. The
+    file is saved wherever your browser saves downloads. The export is
+    initiated only by your click; the extension never exports data on
+    its own or sends the exported file anywhere.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If the extension is ever updated in a way that changes how it
+    handles data — for example, by adding any kind of network request,
+    cloud sync, telemetry, or third-party service — this policy will be
+    updated and the change will be noted in the repository's release
+    notes before that version is published.</p>
+
+  <h2>Contact</h2>
+  <p>The extension's source code is available at
+    <a href="https://github.com/e-gorodnitskiy/llo-extension">https://github.com/e-gorodnitskiy/llo-extension</a>.
+    Questions, concerns, or rights-holder requests can be raised via the
+    repository's issue tracker.</p>
 </body>
 </html>

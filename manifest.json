@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "LLO.lu Progress Tracker",
+  "name": "Progress Tracker for LLO.lu",
   "version": "0.0.1",
-  "description": "Tracks your llo.lu progress (exercise scores and theory views) locally in your browser, with in-page badges showing what you've done.",
+  "description": "Tracks your llo.lu progress (exercise scores and theory views) locally in your browser, with in-page badges showing what you've done. Not affiliated with llo.lu.",
   "permissions": ["storage", "sidePanel"],
   "host_permissions": ["https://llo.lu/*"],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "LLO Progress",
+    "default_title": "Progress Tracker for LLO.lu",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
