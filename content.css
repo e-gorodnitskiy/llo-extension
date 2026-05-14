@@ -1,0 +1,130 @@
+/* LLO Tracker — in-page badge styles. All selectors are llo-tracker- prefixed. */
+
+.llo-tracker-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: middle;
+  border: 1px solid currentColor;
+  opacity: 0.92;
+  cursor: default;
+}
+
+.llo-tracker-badge::before {
+  content: '•';
+  margin-right: 3px;
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+/* Passed (green) */
+.llo-tracker-passed {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+/* Failed / attempted (amber) */
+.llo-tracker-failed {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+/* Viewed (blue) */
+.llo-tracker-viewed {
+  color: #1e40af;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+/* Lesson summary pill */
+.llo-tracker-summary {
+  color: #4b5563;
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.llo-tracker-summary.llo-tracker-passed {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.llo-tracker-summary.llo-tracker-viewed {
+  color: #1e40af;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+/* Positioned badge for lesson cards that use overflow:hidden + fixed height.
+   The card link has position:relative, so this anchors to its bottom-right. */
+.llo-tracker-badge-card {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  margin-left: 0;
+  z-index: 10;
+}
+
+/* Level progress banner injected at the top of <main> on level pages */
+.llo-tracker-level-banner {
+  display: block;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+html.dark .llo-tracker-level-banner {
+  background: #052e16;
+  border-color: #166534;
+  color: #86efac;
+}
+
+/* Dark mode — llo.lu uses html.dark */
+html.dark .llo-tracker-passed {
+  color: #86efac;
+  background: #14532d;
+  border-color: #166534;
+}
+
+html.dark .llo-tracker-failed {
+  color: #fcd34d;
+  background: #451a03;
+  border-color: #92400e;
+}
+
+html.dark .llo-tracker-viewed {
+  color: #93c5fd;
+  background: #1e3a5f;
+  border-color: #1e40af;
+}
+
+html.dark .llo-tracker-summary {
+  color: #d1d5db;
+  background: #374151;
+  border-color: #4b5563;
+}
+
+html.dark .llo-tracker-summary.llo-tracker-passed {
+  color: #86efac;
+  background: #14532d;
+  border-color: #166534;
+}
+
+html.dark .llo-tracker-summary.llo-tracker-viewed {
+  color: #93c5fd;
+  background: #1e3a5f;
+  border-color: #1e40af;
+}

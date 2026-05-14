@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLO Progress</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="sp-header">
+    <span class="sp-header-flag">🇱🇺</span>
+    <span class="sp-header-title">LLO.lu Progress Tracker</span>
+  </header>
+
+  <main id="sp-main">
+    <p class="sp-empty">Loading…</p>
+  </main>
+
+  <footer class="sp-footer">
+    <section class="sp-settings">
+      <label class="sp-settings-label">
+        <input type="checkbox" id="sp-badges-toggle" />
+        Show progress badges on llo.lu
+      </label>
+    </section>
+    <div class="sp-actions" id="sp-actions">
+      <button id="sp-export">Export JSON</button>
+      <button id="sp-reset" class="sp-reset">Reset Data</button>
+    </div>
+  </footer>
+
+  <script src="sidepanel.js" type="module"></script>
+</body>
+</html>
