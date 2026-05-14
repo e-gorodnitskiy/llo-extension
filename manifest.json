@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LLO.lu Progress Tracker",
-  "version": "2.1.0",
+  "version": "0.0.1",
   "description": "Tracks your llo.lu progress (exercise scores and theory views) locally in your browser, with in-page badges showing what you've done.",
   "permissions": ["storage", "sidePanel"],
   "host_permissions": ["https://llo.lu/*"],
