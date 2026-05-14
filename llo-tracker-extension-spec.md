@@ -50,7 +50,7 @@ The following facts were verified by fetching live llo.lu pages:
 | D9 | Side-panel progress format | Absolute counts (no ratio bars). |
 | D10 | Track theory? | Yes; mark as **viewed** after `VIEWED_DWELL_MS = 5000ms`. |
 | D11 | Where to read `uiLang` | From `props.locale` in the Inertia page-prop JSON. |
-| D12 | Inertia props missing or unparseable | Skip the activity. Don't fall back to URL-only parsing. |
+| D12 | Inertia props missing or unparseable | **Fall back to URL parsing** for `activityCode`, `lessonCode`, and `locale`. Full props are still preferred; fallback fills in what it can. |
 | D13 | Unknown `activity.type` | Treat as `viewed`. Record the type verbatim. |
 | D14 | In-page badges default | **On.** User can disable in side-panel settings. |
 | D15 | Where to put the in-page badge | Appended **after** the existing link/card content as a sibling span. Class-prefixed `llo-tracker-` so it can't collide with llo.lu styles. |
@@ -85,7 +85,7 @@ README.md
 {
   "manifest_version": 3,
   "name": "LLO.lu Progress Tracker",
-  "version": "2.1.0",
+  "version": "0.0.1",
   "description": "Tracks your llo.lu progress (exercise scores and theory views) locally in your browser, with in-page badges showing what you've done.",
   "permissions": ["storage", "sidePanel"],
   "host_permissions": ["https://llo.lu/*"],
@@ -146,9 +146,13 @@ const LESSON_PATH_RE =
 
 const LESSONS_INDEX_RE =
   /^\/(?:(?<lang>de|en|lb)\/)?learn\/lessons\/?$/;
+
+// Matches /learn/{theme}/{level} pages (e.g. /en/learn/PROGRESS_IN_THE_LANGUAGE_LB_LU/A1)
+const LEVEL_PATH_RE =
+  /^\/(?:(?<lang>de|en|lb)\/)?learn\/(?!lessons(?:\/|$))(?<theme>[^/]+)\/(?<level>[^/]+)\/?$/;
 ```
 
-`isActivityPath` / `isLessonPath` / `isLessonsIndex` are quick checks
+`isActivityPath` / `isLessonPath` / `isLessonsIndex` / `isLevelPath` are quick checks
 used to decide whether to bother reading page props at all.
 
 ### 3.1 Activity types
@@ -166,8 +170,19 @@ const VIEWED_TYPES = new Set([
 
 function classify(type) {
   if (SCORED_TYPES.has(type)) return 'scored';
-  if (VIEWED_TYPES.has(type)) return 'viewed';
   return 'viewed'; // D13: unknown types treated as theory
+}
+
+// Fallback when data-page type is unavailable: infer from activity code tokens.
+// Returns 'viewed', 'scored', or null (unknown).
+function classifyFromCode(code) {
+  if (!code) return null;
+  const upper = code.toUpperCase();
+  for (const vt of VIEWED_TYPES) {
+    if (upper.includes(vt)) return 'viewed';
+  }
+  if (/EXERCISE|EXERCICE|QUIZ|SPELLING|FIND_TIME|WRITE_TIME|SUMMARY_TEST/.test(upper)) return 'scored';
+  return null;
 }
 ```
 
@@ -246,14 +261,18 @@ function parseCode(code) {
 const PASS_THRESHOLD  = 0.7;
 const STABILITY_MS    = 800;
 const VIEWED_DWELL_MS = 5000;
-const SCORE_SELECTOR  = 'main text.CircularProgressbar-text';
 
-let scoreObserver  = null;     // MutationObserver: result-screen score
-let pageObserver   = null;     // MutationObserver: #app[data-page]
-let stabilityTimer = null;
-let viewedTimer    = null;
-let lastSeenText   = null;
-const savedThisLoad = new Set();
+let scoreObserver      = null;  // MutationObserver: result-screen score
+let pageObserver       = null;  // MutationObserver: #app[data-page]
+let stabilityTimer     = null;
+let viewedTimer        = null;
+let lastSeenText       = null;
+let currentCapturePath = null;  // path for which capture was started
+const savedThisLoad    = new Set();
+
+let badgeDebounceTimer = null;
+let mainBadgeObserver  = null;
+let badgeRefreshing    = false;  // prevents recursive refresh from MutationObserver
 
 let settings = { showInPageBadges: true };  // hydrated on init
 ```
@@ -273,70 +292,93 @@ init();
 
 ### 5.3 `onNavigate()`
 
-1. Tear down per-page observers/timers.
-2. Decide what to do based on URL and props:
-   - If `isActivityPath(location.pathname)` and props give us an activity → start capture (§5.4–5.5).
-   - In all cases, refresh in-page badges (§13).
+`onNavigate()` is fired both by `llo:navigate` (history changes) and by the `data-page` attribute observer (Inertia partial visits that don't fire history events). Because Inertia emits multiple `data-page` mutations per navigation, the function tracks `currentCapturePath`:
+
+- If `location.pathname !== currentCapturePath`: genuine new navigation → call `teardown()`, set `currentCapturePath`, start capture.
+- If path is the same: Inertia partial update at same URL → skip teardown and capture; only refresh badges.
+
+Capture (on genuine activity-path navigation):
+- Always start **both** `startScoreObserver(path)` and `startDwell(path)`. `commitViewed` re-checks the activity type at its 5 s fire time and blocks itself if the type is scored. `commitScore` cancels the dwell timer when a result is found first.
+
+In all cases (both branches), on lesson pages call `cacheLessonData()` and always run `refreshBadges()` + `startMainObserver()` via `setTimeout(0)` (to let llo.lu paint first).
 
 ### 5.4 Theory: dwell-timer capture
 
 ```js
-function startDwell(pd) {
-  viewedTimer = setTimeout(() => commitViewed(pd), VIEWED_DWELL_MS);
+function startDwell(path) {
+  viewedTimer = setTimeout(() => commitViewed(path), VIEWED_DWELL_MS);
 }
 
-function commitViewed(pd) {
-  const code = pd.activity.code;
+function commitViewed(path) {
+  // Re-read page props at fire time (5 s later) — they're now reliable.
+  const pd       = readPageProps();
+  const activity = pd?.props?.activity;
+  const type     = activity?.type;
+  const code     = activity?.code ?? activityCodeFromPath(path);
+
+  // Block if this is a scored exercise (user may be mid-exercise without result yet).
+  if (type && SCORED_TYPES.has(type)) return;
+  if (!type && classifyFromCode(code) === 'scored') return;
+
+  if (!code) return;
   if (savedThisLoad.has(code)) return;
   savedThisLoad.add(code);
-  saveViewed(pd);   // §6
+  saveViewed(path);
 }
 ```
 
 ### 5.5 Scored: result-screen observer
 
+The result screen shows the score as a **percentage** in `<main>` textContent (e.g. `83 %`). We read this from the entire `main` text rather than a specific widget, because the CircularProgressbar widgets show question-answered counts (`6/6`), not the actual score percentage.
+
+**Guard against false positives**: `checkForResult` first checks the current activity type. If the type is a known theory type (or the code looks like a theory activity via `classifyFromCode`), it returns early — this prevents percentage strings that appear in theory content (e.g. "80% of sentences…") from being mistaken for a score.
+
 ```js
-function startScoreObserver(pd) {
-  scoreObserver = new MutationObserver(() => checkForResult(pd));
+function startScoreObserver(path) {
+  scoreObserver = new MutationObserver(() => checkForResult(path));
   scoreObserver.observe(document.body, { childList: true, subtree: true });
-  checkForResult(pd);
+  checkForResult(path);
 }
 
-function checkForResult(pd) {
-  // SCORE_SELECTOR is `main text.CircularProgressbar-text` — excludes
-  // the in-header question-progress widget.
-  const node = document.querySelector(SCORE_SELECTOR);
-  if (!node) return;
+function checkForResult(path) {
+  // Re-check type guard each call (props may update mid-exercise).
+  const activity = readPageProps()?.props?.activity;
+  const type     = activity?.type;
+  const code     = activity?.code ?? activityCodeFromPath(path);
+  if (type && !SCORED_TYPES.has(type)) return;
+  if (!type && classifyFromCode(code) === 'viewed') return;
 
-  const text = (node.textContent || '').trim();
-  if (text === lastSeenText) return;
-  lastSeenText = text;
-
-  const m = text.match(/^(\d+)\s*\/\s*(\d+)$/);
+  // Look for a percentage in <main> textContent.
+  const mainText = document.querySelector('main')?.textContent ?? '';
+  const m = mainText.match(/\b(\d+(?:\.\d+)?)\s*%/);
   if (!m) return;
-  const score = parseInt(m[1], 10);
-  const total = parseInt(m[2], 10);
-  if (
-    !Number.isInteger(score) || !Number.isInteger(total) ||
-    total <= 0 || score < 0 || score > total
-  ) return;
 
+  const pct = parseFloat(m[1]);
+  if (pct < 0 || pct > 100) return;
+
+  const canonText = `${Math.round(pct)}%`;
+  if (canonText === lastSeenText) return;
+
+  lastSeenText = canonText;
   clearTimeout(stabilityTimer);
   stabilityTimer = setTimeout(
-    () => commitScore(pd, score, total),
+    () => commitScore(path, Math.round(pct), 100),
     STABILITY_MS
   );
 }
 
-function commitScore(pd, score, total) {
-  const code = pd.activity.code;
+function commitScore(path, score, total) {
+  const code = readPageProps()?.props?.activity?.code ?? activityCodeFromPath(path);
+  if (!code) return;
   if (savedThisLoad.has(code)) return;
   savedThisLoad.add(code);
-  saveScore(pd, score, total);
-  scoreObserver?.disconnect();
-  scoreObserver = null;
+  clearTimeout(viewedTimer); viewedTimer = null;  // score wins over dwell
+  saveScore(path, score, total);
+  scoreObserver?.disconnect(); scoreObserver = null;
 }
 ```
+
+Scores are stored with `total = 100` (i.e. `bestScore` is the rounded percentage, `bestTotal` is always 100). This means `bestScore / bestTotal` equals the displayed percentage directly.
 
 ### 5.6 `data-page` attribute observer
 
@@ -373,9 +415,12 @@ function onStorageChange(changes, area) {
 ```js
 function teardown() {
   scoreObserver?.disconnect(); scoreObserver = null;
-  clearTimeout(stabilityTimer);
-  clearTimeout(viewedTimer);
-  lastSeenText = null;
+  clearTimeout(stabilityTimer); stabilityTimer = null;
+  clearTimeout(viewedTimer);    viewedTimer    = null;
+  lastSeenText       = null;
+  currentCapturePath = null;
+  savedThisLoad.clear();
+  removeAllBadges();
   // pageObserver and storage listener stay for the lifetime of the tab.
 }
 ```
@@ -390,8 +435,11 @@ function teardown() {
 
 ```
 activity:{activityCode}  →  ActivityRecord
+lesson:{lessonCode}      →  LessonCache
 settings                 →  Settings
 ```
+
+`lesson:*` keys are written whenever the content script sees a lesson page (i.e. `isLessonPath(path)`) with valid `props.lesson.activities`. They let the badge code show accurate `done/total` counts even on pages that don't list all activities in the current view. See §6.4.
 
 ### `ActivityRecord` (scored)
 
@@ -406,14 +454,18 @@ settings                 →  Settings
   level:          string,        // "A1" | "A2" | "B1" | "B2"
   theme:          string,        // "GRAMMAR" | "VOCABULARY" | …
   uiLang:         string,
-  bestScore:      number,
-  bestTotal:      number,
+  bestScore:      number,        // best rounded percentage (0–100); bestTotal is always 100
+  bestTotal:      number,        // always 100
+  lastScore:      number,        // score of the most recent attempt
+  lastTotal:      number,        // total of the most recent attempt (always 100)
   attempts:       number,
   firstCompleted: string,        // ISO 8601
   lastCompleted:  string,
-  passed:         boolean,
+  passed:         boolean,       // ever passed (once true, stays true)
 }
 ```
+
+`bestScore / bestTotal` is the displayed percentage. `lastScore` / `lastTotal` record the most recent attempt and are shown in the side panel as "83% best / 67% last" when they differ from the best.
 
 ### `ActivityRecord` (viewed)
 
@@ -443,12 +495,22 @@ settings                 →  Settings
 }
 ```
 
-### `saveScore(pd, score, total)` and `saveViewed(pd)`
+### `LessonCache`
 
-Same logic as v2 — see §6 of the previous revision. Field semantics
-unchanged. The only difference is that on save, the storage-change
-listener fires automatically and refreshes both the side panel and any
-open llo.lu tabs' in-page badges.
+```js
+{
+  lessonCode: string,
+  lessonName: string,
+  activities: [{ code: string, type: string, name: string }],
+  cachedAt:   string,  // ISO 8601
+}
+```
+
+Written by `cacheLessonData(path)` whenever the content script lands on a lesson page. Used by `injectLessonSummaryBadges` and `injectMissionBadges` to compute accurate `done/total` fractions.
+
+### `saveScore(path, score, total)` and `saveViewed(path)`
+
+Both functions read Inertia page props at call time, but also fall back to URL parsing if props are unavailable (D12 override — see Open Decisions). On every save, the storage-change listener fires and refreshes both the side panel and any open llo.lu tabs' in-page badges.
 
 ---
 
@@ -504,10 +566,12 @@ Per-activity row:
 | Kind | Icon | Right-side label |
 |---|---|---|
 | viewed | 📖 | `v×{viewCount}` |
-| scored, passed | ✅ | `bestScore/bestTotal NN%` |
-| scored, !passed | ⚠️ | `bestScore/bestTotal NN%` |
+| scored, passed | ✅ | `NN% best [/ MM% last] [(×N)]` |
+| scored, !passed | ⚠️ | `NN% best [/ MM% last] [(×N)]` |
 
-If `attempts > 1` for scored, append ` (×N)` after the percentage.
+If `lastScore !== bestScore`, show "83% best / 67% last". If `attempts > 1`, append ` (×N)`. Because scores are stored as percentages (`bestTotal = 100`), the display is simply `bestScore%`.
+
+Date of last completion/view is shown below the score in a smaller style.
 
 Settings section: a checkbox bound to `settings.showInPageBadges`. On
 change, write the new settings object to `chrome.storage.local`. The
@@ -515,7 +579,7 @@ content script's storage listener picks it up and refreshes badges.
 
 Buttons:
 
-- **Export JSON**: build `{ exportedAt, version: "2.1.0", settings, activities: { ... } }`, save as `llo-progress-YYYY-MM-DD.json`.
+- **Export JSON**: build `{ exportedAt, version: "2.1.0", settings, activities: { ... } }`, save as `llo-progress-YYYY-MM-DD.json`. (`VERSION` constant in `sidepanel.js` is `"2.1.0"` and is independent of the manifest version.)
 - **Reset Data**: replaces both buttons with `Are you sure? [Cancel] [Yes, delete all]`. Confirm → `await chrome.storage.local.clear()` then re-render. (Settings reset to defaults.)
 
 ### 7.3 Live updates
@@ -630,8 +694,8 @@ already attempted while browsing.
 
 - **Lesson detail page** (`…/learn/lessons/{LESSON_CODE}`) — one badge on each activity link.
 - **Lessons index** (`…/learn/lessons`) — one badge on each lesson card, summarizing its activities (e.g. `2/3 done`, or `✓ all done`).
-- **Kickstart / theme browser pages** (`…/learn/kickstart`, `…/learn/{theme?}/{level?}`) — same lesson-card summary.
-- **Activity page** (`…/learn/lessons/{L}/{A}`) — optional status note in the page header area, showing previous best (e.g. "Previous best: 4/5"). Default off; toggle in settings.
+- **Level / theme browser pages** (`…/learn/{theme}/{level}`, matched by `LEVEL_PATH_RE`) — lesson-card summary badges, **plus** a level progress banner at the top of `<main>` and per-mission progress badges on accordion triggers.
+- **Activity page** (`…/learn/lessons/{L}/{A}`) — a status badge appended to `<header>` showing the previous best.
 
 ### 13.2 How the content script finds links to badge
 
@@ -678,29 +742,49 @@ we add a more specific selector — but we don't override site styles.
 ### 13.5 Update lifecycle
 
 ```js
-async function refreshBadges() {
-  removeAllBadges();
-  if (!settings.showInPageBadges) return;
-  const records = await loadAllRecords();
-  const path = location.pathname;
-  if (isActivityPath(path))      injectActivityHeaderBadge(records);
-  else if (isLessonPath(path))   injectActivityCardBadges(records);
-  else if (isLessonsIndex(path)) injectLessonSummaryBadges(records);
-  // future: kickstart, theme browser
+function removeAllBadges() {
+  document.querySelectorAll('.llo-tracker-badge, .llo-tracker-level-banner').forEach((b) => b.remove());
 }
 
-function removeAllBadges() {
-  document.querySelectorAll('.llo-tracker-badge').forEach((b) => b.remove());
+async function refreshBadges() {
+  badgeRefreshing = true;
+  try {
+    if (!settings.showInPageBadges) return;
+    const [records, lessonCache] = await Promise.all([loadAllRecords(), loadLessonCache()]);
+    const path = location.pathname;
+    if (isActivityPath(path)) {
+      injectActivityHeaderBadge(records);
+    } else {
+      injectActivityCardBadges(records);
+      injectLessonSummaryBadges(records, lessonCache);
+      if (isLevelPath(path)) {
+        injectLevelSummaryBadge(records);
+        injectMissionBadges(records, lessonCache);
+      }
+    }
+  } finally {
+    badgeRefreshing = false;
+  }
 }
 ```
 
+`refreshBadges()` does **not** remove badges before re-running. Instead each inject function checks whether a badge already exists on each element and skips (same text) or replaces (text changed). `removeAllBadges()` is called only in `teardown()` (on genuine navigation). This avoids a visible flash on partial data-page updates.
+
+`badgeRefreshing` prevents the `MutationObserver` on `<main>` from triggering a recursive refresh when our own injection mutates the DOM.
+
 `refreshBadges()` is called:
 
-- On every `llo:navigate` (after the page-content settles — small `setTimeout(0)` to let llo.lu's renderer paint first).
+- On every `llo:navigate` after `setTimeout(0)` (lets llo.lu paint first).
 - On every `chrome.storage.onChanged` event.
-- On every mutation inside `<main>` that adds new `<a>` elements — but debounced (≥ 250 ms) to avoid loops, since our own injection mutates the DOM. Use a one-shot `requestIdleCallback` schedule.
+- Via the debounced `MutationObserver` on `<main>` (≥ 250 ms) for cases where llo.lu adds links after the initial render.
 
-`refreshBadges()` is **idempotent**: it removes prior badges before adding new ones. No double-rendering.
+### 13.8 Level/mission badges (level pages only)
+
+Two additional badge types are injected when `isLevelPath(path)`:
+
+**Level progress banner** — a `div.llo-tracker-level-banner` inserted as the first child of `<main>`, showing "A1: 3/12 lessons started, 5 exercises passed". Driven by `props.missions` from Inertia and the lesson cache. Removed and re-created on each `refreshBadges()` call.
+
+**Mission badges** — accordion triggers on level pages are `button[aria-expanded]:not([aria-haspopup])`. For each mission in `props.missions` whose name matches a button's text, a summary badge is appended showing lesson progress: `✓ N lessons`, `N done, M started`, or `N/total started`. Uses the lesson cache for accurate "fully done" detection.
 
 ### 13.6 What "additive overlay" means precisely
 

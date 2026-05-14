@@ -26,11 +26,15 @@ no network requests, no analytics.
 ## How it shows you progress
 
 **Badges on llo.lu pages.** While you browse the site, small status
-pills appear next to each exercise link:
+pills appear next to each exercise link and lesson card:
 
-- ✅ green pill with score (e.g. `4/4`) — passed
-- ⚠️ yellow pill with score (e.g. `2/5`) — attempted but didn't pass
+- ✅ green pill with score (e.g. `83%`) — passed
+- ⚠️ yellow pill with score (e.g. `50%`) — attempted but didn't pass
 - 📖 blue pill with view count — theory you've viewed
+- Summary pills on lesson cards (e.g. `2/3`) showing how many activities in that lesson you've done
+- On level pages, a banner at the top of the page and per-mission pills on accordion sections
+
+If you've attempted something more than once, the badge shows your best and most recent score (e.g. `83% best / 50% last`).
 
 You can turn these off if you prefer a clean page (see _Disabling
 badges_ below).
@@ -74,9 +78,7 @@ backups or move data between browsers manually.
 
 ## Known limitations
 
-- The extension can only see what you've actually visited. It can't
-  enumerate the activities you haven't tried yet, so there's no
-  "completion percentage" — only counts.
+- The extension learns a lesson's full activity list by caching the lesson detail page when you visit it. Until you've visited a lesson page, summary badges can only count what you've already done, not the total.
 - A score is captured only when the result screen is shown. If you
   navigate away from an exercise before the result appears, that
   attempt isn't recorded.
