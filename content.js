@@ -625,13 +625,16 @@ function onNavigate() {
     console.log('[llo-tracker] onNavigate (data-page update, same path)', path);
   }
 
-  // Cache lesson activity list whenever we're on a lesson page and data-page updates.
-  // Called in both branches so later data-page updates (with fresh props) are also captured.
-  if (isLessonPath(path)) {
-    cacheLessonData(path).catch((e) => console.error('[llo-tracker] cacheLessonData failed', e));
-  }
+  // Cache lesson activity list whenever data-page updates on a lesson or activity page.
+  // Activity pages also carry full props.lesson in Inertia data, so we capture the cache
+  // even when the user navigates directly to an activity without visiting the lesson index.
+  // We await the cache write before refreshing badges so the mission done/started counts
+  // are based on up-to-date cache data.
+  const cachePromise = (isLessonPath(path) || isActivityPath(path))
+    ? cacheLessonData(path).catch((e) => console.error('[llo-tracker] cacheLessonData failed', e))
+    : Promise.resolve();
 
-  setTimeout(() => { refreshBadges(); startMainObserver(); }, 0);
+  cachePromise.then(() => { refreshBadges(); startMainObserver(); });
 }
 
 // ── Storage change listener ───────────────────────────────────────────────────
